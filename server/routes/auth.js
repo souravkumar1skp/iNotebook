@@ -3,7 +3,9 @@ const router = express.Router();
 const User = require('../models/User')
 const { body, validationResult } = require('express-validator');
 const bcrypt= require('bcryptjs')
-const jwt= require('jsonwebtoken')
+const jwt= require('jsonwebtoken');
+const fetchuser = require("../middleware/fectchuser");
+const secretkey= process.env.SECRET_KEY;
 
 //Route 1:register user
 router.post('/createuser',
@@ -29,19 +31,19 @@ router.post('/createuser',
         Email: req.body.Email,
         Password: secPass,
       })
-      // jwt web tokenization
-      secretkey= process.env.SECRET_KEY;
-      authtoken=jwt.sign({
-        // exp: Math.floor(Date.now() / 1000) + (60 * 60),
-        data: User.id
-      }, secretkey, { expiresIn: '1h' });
-
-      res.json({jwtdata});
+      .then(user => {
+        const data = {
+          user: {
+            id: user.id
+          }
+        }
+        const authtoken = jwt.sign(data, secretkey);
+        res.json({success: 'user successfully registered',authtoken});
+      });
     } catch (error) {
       console.log(error.message)
       res.status(500).json({ msg: 'Internal sever error occured' })
     }
-    // .then(user => res.json(user));
   })
 
 //Route 2: login user with correct credentials. login not required
@@ -64,11 +66,13 @@ router.post('/login',
       if(!passcomp)
       return res.status(400).json({error: 'please try to login with correct credentials'})
 
-      secretkey= process.env.SECRET_KEY;
-      authtoken=jwt.sign({
-        // exp: Math.floor(Date.now() / 1000) + (60 * 60),
-        data: User.id
-      }, secretkey, { expiresIn: '1h' });
+      const data = {
+        user: {
+          id: user.id
+        }
+      }
+      const authtoken = jwt.sign(data, secretkey);
+      // authtoken=jwt.sign(data, secretkey/*, {expiresIn: "1h"}*/);
       res.json({authtoken});
     } catch (error) {
       console.log(error.message)
@@ -78,10 +82,8 @@ router.post('/login',
 
 // Route 3:get logged in user details. login required
 router.post('/getuser', fetchuser,  async (req, res) => {
-
   try {
-    userId = req.user.id;
-    const user = await User.findById(userId).select("-password")
+    const user = await User.findById(req.user.id).select("-Password")
     res.send(user)
   } catch (error) {
     console.error(error.message);
